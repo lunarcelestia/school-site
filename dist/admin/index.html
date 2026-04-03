@@ -14,8 +14,11 @@
 <body>
   <script>
     window.CMS_CONFIG = {
-      backend: { name: "local-backend" },
-      local_backend: { url: "/api", allowed_hosts: ["*"] },
+      backend: {
+        name: "github",
+        repo: "lunarcelestia/school-site", 
+        branch: "main",
+      },
       media_folder: "public/images",
       public_folder: "/images",
       collections: [
