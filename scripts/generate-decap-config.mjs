@@ -567,7 +567,7 @@ const rootFields = [
 
 const config = {
   // Должен совпадать с Authorization callback URL в GitHub OAuth App (лучше со слэшем в конце)
-  site_url: "https://cq625613.tw1.ru/admin/index.html",
+  site_url: "https://cq625613.tw1.ru/admin/",
   backend: {
     name: "github",
     repo: "lunarcelestia/school-site",
