@@ -4,10 +4,18 @@
 #   TIMEWEB_FTP_HOST, TIMEWEB_FTP_USER, TIMEWEB_FTP_PASSWORD
 #
 # Переменная репозитория (та же страница → вкладка Variables):
-#   TIMEWEB_FTP_REMOTE_DIR — папка на FTP (например public_html), со слэшем или без — workflow сам добавит / в конце.
-#   Если не задавать — используется ./
+#   TIMEWEB_FTP_REMOTE_DIR — относительный путь от корня FTP до папки с index.html сайта.
+#   На Timeweb у пробного домена *.tw1.ru часто НЕ корневой public_html, а:
+#     domains/cq625613.tw1.ru/public_html
+#   (проверь в FileZilla полный путь к тому index.html, что открывается в браузере.)
+#   Со слэшем в конце или без — workflow сам добавит /.
+#   LIVE_SITE_URL — (опционально) URL для проверки после деплоя; по умолчанию https://cq625613.tw1.ru
 #
 # FTPS: если Deploy падает на соединении — раскомментируй protocol ниже.
+#
+# Если на хостинге меняется только .ftp-deploy-sync-state.json — экшен «думает», что
+# файлы уже совпадают с билдом. Перед деплоем мы удаляем этот файл по FTP, чтобы
+# заново залились index.html, admin/, data/.
 
 name: Deploy to Timeweb
 
@@ -71,6 +79,25 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "FTP server-dir will be: $OUT"
 
+      - name: Удалить на сервере .ftp-deploy-sync-state.json (иначе FTP может ничего не заливать)
+        env:
+          FTP_HOST: ${{ secrets.TIMEWEB_FTP_HOST }}
+          FTP_USER: ${{ secrets.TIMEWEB_FTP_USER }}
+          FTP_PASS: ${{ secrets.TIMEWEB_FTP_PASSWORD }}
+          REMOTE_DIR: ${{ steps.remote.outputs.dir }}
+        run: |
+          set -e
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq lftp
+          R=$(printf '%s' "$REMOTE_DIR" | sed 's#^\./##' | sed 's#/$##')
+          if [ -z "$R" ] || [ "$R" = "." ]; then
+            LFTP_CD="cd ."
+          else
+            LFTP_CD="cd $R"
+          fi
+          echo "lftp: $LFTP_CD → rm .ftp-deploy-sync-state.json"
+          lftp -u "$FTP_USER,$FTP_PASS" -e "set ssl:verify-certificate no; set net:max-retries 5; $LFTP_CD; rm -f .ftp-deploy-sync-state.json; bye" "ftp://$FTP_HOST"
+
       - name: Deploy to FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -82,3 +109,20 @@ jobs:
           # protocol: ftps-legacy
           # port: 21
           log-level: standard
+
+      - name: Проверка — с сайта отдаётся тот же index.html, что в dist
+        run: |
+          SITE="${VERIFY_URL:-https://cq625613.tw1.ru}"
+          LOCAL_SHA=$(sha256sum dist/index.html | cut -d' ' -f1)
+          curl -fsSL "$SITE/?_=$(date +%s)" -o /tmp/live.html
+          REMOTE_SHA=$(sha256sum /tmp/live.html | cut -d' ' -f1)
+          echo "local  sha256=$LOCAL_SHA ($(wc -c < dist/index.html) bytes)"
+          echo "remote sha256=$REMOTE_SHA ($(wc -c < /tmp/live.html) bytes)"
+          if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
+            echo "::error::С сервера отдаётся ДРУГОЙ index.html — деплой ушёл не в ту папку."
+            echo "Задай Variables → TIMEWEB_FTP_REMOTE_DIR = domains/cq625613.tw1.ru/public_html (или полный путь из FileZilla до папки с рабочим index.html)."
+            exit 1
+          fi
+          echo "OK: хеш index.html совпадает с продакшеном."
+        env:
+          VERIFY_URL: ${{ vars.LIVE_SITE_URL }}
