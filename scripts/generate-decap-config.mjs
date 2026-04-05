@@ -491,7 +491,7 @@ const rootFields = [
     name: "project_practices",
     widget: "list",
     label_singular: "практика",
-    fields: modalFields,
+    fields: structuredClone(modalFields),
   },
   {
     label: "Сообщества — модалки классов (ключ в JSON: communities)",
@@ -561,7 +561,7 @@ const rootFields = [
     name: "office_features",
     widget: "list",
     label_singular: "тест",
-    fields: modalFields,
+    fields: structuredClone(modalFields),
   },
 ];
 
@@ -596,5 +596,9 @@ const config = {
 
 const outPath = path.join(root, "public/admin/config.yml");
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, YAML.stringify(config, { lineWidth: 100 }), "utf8");
+fs.writeFileSync(
+  outPath,
+  YAML.stringify(config, { lineWidth: 100, aliasDuplicateObjects: false }),
+  "utf8"
+);
 console.log("Written", outPath);
