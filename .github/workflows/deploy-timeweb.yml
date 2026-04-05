@@ -4,8 +4,8 @@
 #   TIMEWEB_FTP_HOST, TIMEWEB_FTP_USER, TIMEWEB_FTP_PASSWORD
 #
 # Переменная репозитория (та же страница → вкладка Variables):
-#   TIMEWEB_FTP_REMOTE_DIR — папка на FTP куда заливать (например public_html).
-#   Если НЕ создавать переменную — используется ./ (корень после входа по FTP).
+#   TIMEWEB_FTP_REMOTE_DIR — папка на FTP (например public_html), со слэшем или без — workflow сам добавит / в конце.
+#   Если не задавать — используется ./
 #
 # FTPS: если Deploy падает на соединении — раскомментируй protocol ниже.
 
@@ -48,6 +48,29 @@ jobs:
           echo -n "dist/index.html bytes: "; wc -c < dist/index.html
           echo -n "dist/index.html sha256: "; sha256sum dist/index.html | cut -d' ' -f1
 
+      # FTP-Deploy-Action: server-dir обязан заканчиваться на /
+      - name: Normalize FTP server-dir
+        id: remote
+        env:
+          RAW: ${{ vars.TIMEWEB_FTP_REMOTE_DIR }}
+        run: |
+          if [ -z "$RAW" ]; then
+            OUT="./"
+          else
+            OUT="$RAW"
+            case "$OUT" in
+              */) ;;
+              *) OUT="${OUT}/" ;;
+            esac
+          fi
+          {
+            echo "dir<<REMOTE_EOF"
+            echo -n "$OUT"
+            echo ""
+            echo "REMOTE_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "FTP server-dir will be: $OUT"
+
       - name: Deploy to FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -55,7 +78,7 @@ jobs:
           username: ${{ secrets.TIMEWEB_FTP_USER }}
           password: ${{ secrets.TIMEWEB_FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: ${{ vars.TIMEWEB_FTP_REMOTE_DIR != '' && vars.TIMEWEB_FTP_REMOTE_DIR || './' }}
+          server-dir: ${{ steps.remote.outputs.dir }}
           # protocol: ftps-legacy
           # port: 21
           log-level: standard
