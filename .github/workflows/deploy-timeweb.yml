@@ -1,12 +1,13 @@
 # Автодеплой на Timeweb: push в main → build → загрузка dist/ по FTP.
 #
 # Настройка (GitHub → Settings → Secrets and variables → Actions):
-#   TIMEWEB_FTP_HOST      — хост FTP из панели Timeweb
-#   TIMEWEB_FTP_USER      — логин FTP
-#   TIMEWEB_FTP_PASSWORD  — пароль FTP
-#
-# Каталог на сервере: ниже server-dir: ./ (корень после входа по FTP).
-# Если в FileZilla ты видишь домен внутри public_html — поменяй server-dir на public_html.
+#   TIMEWEB_FTP_HOST           — хост FTP (vh440.timeweb.ru)
+#   TIMEWEB_FTP_USER           — логин FTP
+#   TIMEWEB_FTP_PASSWORD       — пароль FTP
+#   TIMEWEB_FTP_REMOTE_DIR     — (опционально) папка сайта на сервере относительно входа по FTP.
+#       Если не задан — используется public_html (типично для Timeweb: в корне FTP есть public_html).
+#       Если в FileZilla после входа ты УЖЕ внутри папки с index.html — задай секрет: .
+#       Если сайт в domains/ИМЯ/public_html — задай: domains/cq625613.tw1.ru/public_html
 #
 # Если соединение не проходит: проверь FTP/FTPS в панели Timeweb.
 # При необходимости раскомментируй protocol в шаге Deploy.
@@ -41,6 +42,20 @@ jobs:
         run: |
           npm ci
           npm run build
+          ls -la dist/
+
+      - name: Куда грузить на FTP (Timeweb чаще всего public_html)
+        id: ftpdir
+        env:
+          OVERRIDE: ${{ secrets.TIMEWEB_FTP_REMOTE_DIR }}
+        run: |
+          if [ -n "$OVERRIDE" ]; then
+            D="$OVERRIDE"
+          else
+            D="public_html"
+          fi
+          echo "dir=$D" >> "$GITHUB_OUTPUT"
+          echo "FTP server-dir will be: $D"
 
       - name: Deploy to FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -49,7 +64,7 @@ jobs:
           username: ${{ secrets.TIMEWEB_FTP_USER }}
           password: ${{ secrets.TIMEWEB_FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: ./
+          server-dir: ${{ steps.ftpdir.outputs.dir }}
           # protocol: ftps-legacy
           # port: 21
           log-level: standard
