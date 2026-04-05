@@ -1,0 +1,55 @@
+# Автодеплой на Timeweb: push в main → build → загрузка dist/ по FTP.
+#
+# Настройка (GitHub → Settings → Secrets and variables → Actions):
+#   TIMEWEB_FTP_HOST      — хост FTP из панели Timeweb
+#   TIMEWEB_FTP_USER      — логин FTP
+#   TIMEWEB_FTP_PASSWORD  — пароль FTP
+#
+# Каталог на сервере: ниже server-dir: ./ (корень после входа по FTP).
+# Если в FileZilla ты видишь домен внутри public_html — поменяй server-dir на public_html.
+#
+# Если соединение не проходит: проверь FTP/FTPS в панели Timeweb.
+# При необходимости раскомментируй protocol в шаге Deploy.
+
+name: Deploy to Timeweb
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-timeweb
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy to FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.TIMEWEB_FTP_HOST }}
+          username: ${{ secrets.TIMEWEB_FTP_USER }}
+          password: ${{ secrets.TIMEWEB_FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: ./
+          # protocol: ftps-legacy
+          # port: 21
+          log-level: standard
