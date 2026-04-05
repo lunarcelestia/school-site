@@ -1,18 +1,13 @@
 # Автодеплой на Timeweb: push в main → build → загрузка dist/ по FTP.
 #
-# Настройка (GitHub → Settings → Secrets and variables → Actions):
-#   TIMEWEB_FTP_HOST           — хост FTP (vh440.timeweb.ru)
-#   TIMEWEB_FTP_USER           — логин FTP
-#   TIMEWEB_FTP_PASSWORD       — пароль FTP
-#   TIMEWEB_FTP_REMOTE_DIR     — (опционально) куда относительно входа по FTP заливать dist/.
-#       Если НЕ задан — используется "." (текущая папка после входа).
-#       В FileZilla посмотри, где лежит рабочий index.html:
-#         • если сразу видишь index.html — секрет не нужен (или поставь .)
-#         • если сайт в подпапке public_html — задай: public_html
-#         • если путь domains/…/public_html — укажи целиком, например domains/cq625613.tw1.ru/public_html
+# Secrets (Settings → Secrets and variables → Actions → Secrets):
+#   TIMEWEB_FTP_HOST, TIMEWEB_FTP_USER, TIMEWEB_FTP_PASSWORD
 #
-# Если соединение не проходит: проверь FTP/FTPS в панели Timeweb.
-# При необходимости раскомментируй protocol в шаге Deploy.
+# Переменная репозитория (та же страница → вкладка Variables):
+#   TIMEWEB_FTP_REMOTE_DIR — папка на FTP куда заливать (например public_html).
+#   Если НЕ создавать переменную — используется ./ (корень после входа по FTP).
+#
+# FTPS: если Deploy падает на соединении — раскомментируй protocol ниже.
 
 name: Deploy to Timeweb
 
@@ -46,19 +41,6 @@ jobs:
           npm run build
           ls -la dist/
 
-      - name: Куда грузить на FTP (см. секрет TIMEWEB_FTP_REMOTE_DIR)
-        id: ftpdir
-        env:
-          OVERRIDE: ${{ secrets.TIMEWEB_FTP_REMOTE_DIR }}
-        run: |
-          if [ -n "$OVERRIDE" ]; then
-            D="$OVERRIDE"
-          else
-            D="."
-          fi
-          echo "dir=$D" >> "$GITHUB_OUTPUT"
-          echo "FTP server-dir will be: $D"
-
       - name: Deploy to FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -66,8 +48,7 @@ jobs:
           username: ${{ secrets.TIMEWEB_FTP_USER }}
           password: ${{ secrets.TIMEWEB_FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: ${{ steps.ftpdir.outputs.dir }}
-          # Timeweb иногда требует FTPS — если шаг Deploy падает на соединении, раскомментируй:
+          server-dir: ${{ vars.TIMEWEB_FTP_REMOTE_DIR != '' && vars.TIMEWEB_FTP_REMOTE_DIR || './' }}
           # protocol: ftps-legacy
           # port: 21
-          log-level: verbose
+          log-level: standard
