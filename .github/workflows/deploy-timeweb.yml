@@ -35,11 +35,18 @@ jobs:
           node-version: "22"
           cache: npm
 
+      - name: CMS snapshot (data/content.json at this commit)
+        run: |
+          git log -1 --oneline
+          node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('data/content.json','utf8'));const h=j.home||{};console.log('home.hero_badge:',(h.hero_badge||'(пусто)').toString().slice(0,100));"
+
       - name: Install and build
         run: |
           npm ci
           npm run build
           ls -la dist/
+          echo -n "dist/index.html bytes: "; wc -c < dist/index.html
+          echo -n "dist/index.html sha256: "; sha256sum dist/index.html | cut -d' ' -f1
 
       - name: Deploy to FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
